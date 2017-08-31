@@ -138,7 +138,12 @@ class cnn2dModule(object):
         if cost_name == "cross_entropy":
             cost = -tf.reduce_sum(self.Y_gt * tf.log(Y_pred))
         return cost
-
+    
+    def _get_accuracy(self, Y_pred):
+        correct_predict = tf.equal(tf.argmax(Y_pred, 1), tf.argmax(self.Y_gt, 1))
+        accuracy = tf.reduce_mean(tf.cast(correct_predict, 'float'))
+        return accuracy
+    
     def train(self, train_images, train_lanbels, model_path, logs_path, learning_rate,
               dropout_conv=0.8, dropout_hidden=0.7, train_epochs=10000, batch_size=100):
         train_op = tf.train.AdamOptimizer(self.lr).minimize(self.cost)
