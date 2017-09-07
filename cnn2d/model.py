@@ -6,7 +6,7 @@ import tensorflow as tf
 import numpy as np
 
 
-def create_conv_net(X, image_width, image_height, image_channel, image_labels, drop_conv, drop_hidden):
+def _create_conv_net(X, image_width, image_height, image_channel, image_labels, drop_conv, drop_hidden):
     # CNN model
     X1 = tf.reshape(X, [-1, image_width, image_height, image_channel])  # shape=(?, 32, 32, 3)
     # Layer 1
@@ -87,7 +87,7 @@ def create_conv_net(X, image_width, image_height, image_channel, image_labels, d
 
 
 # Serve data by batches
-def next_batch(train_images, train_labels, batch_size, index_in_epoch):
+def _next_batch(train_images, train_labels, batch_size, index_in_epoch):
     start = index_in_epoch
     index_in_epoch += batch_size
 
@@ -127,19 +127,17 @@ class cnn2dModule(object):
         self.drop_conv = tf.placeholder('float')
         self.drop_hidden = tf.placeholder('float')
 
-        Y_pred = create_conv_net(self.X, image_width, image_height, channels, n_class, self.drop_conv, self.drop_hidden)
-        self.cost = self._get_cost(Y_pred, costname)
-
-        correct_predict = tf.equal(tf.argmax(Y_pred, 1), tf.argmax(self.Y_gt, 1))
-        self.accuracy = tf.reduce_mean(tf.cast(correct_predict, 'float'))
+        Y_pred = _create_conv_net(self.X, image_width, image_height, channels, n_class, self.drop_conv, self.drop_hidden)
+        self.cost = self.__get_cost(Y_pred, costname)
+        self.accuracy = self.__get_accuracy(Y_pred)
         self.predict = tf.argmax(Y_pred, 1)
 
-    def _get_cost(self, Y_pred, cost_name):
+    def __get_cost(self, Y_pred, cost_name):
         if cost_name == "cross_entropy":
             cost = -tf.reduce_sum(self.Y_gt * tf.log(Y_pred))
         return cost
     
-    def _get_accuracy(self, Y_pred):
+    def __get_accuracy(self, Y_pred):
         correct_predict = tf.equal(tf.argmax(Y_pred, 1), tf.argmax(self.Y_gt, 1))
         accuracy = tf.reduce_mean(tf.cast(correct_predict, 'float'))
         return accuracy
@@ -163,7 +161,7 @@ class cnn2dModule(object):
 
         for i in range(train_epochs):
             # get new batch
-            batch_xs, batch_ys, index_in_epoch = next_batch(train_images, train_lanbels, batch_size, index_in_epoch)
+            batch_xs, batch_ys, index_in_epoch = _next_batch(train_images, train_lanbels, batch_size, index_in_epoch)
             # check progress on every 1st,2nd,...,10th,20th,...,100th... step
             if i % DISPLAY_STEP == 0 or (i + 1) == train_epochs:
                 train_accuracy = self.accuracy.eval(feed_dict={self.X: batch_xs[batch_size // 10:],
