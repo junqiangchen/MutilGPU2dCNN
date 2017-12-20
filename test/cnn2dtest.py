@@ -30,8 +30,8 @@ def train():
     train_labels = labels[0:]
 
     cnn2d = cnn2dModule(64, 64, 3, 2)
-    cnn2d.train(train_images, train_labels, "E:\pythonworkspace\\neusoftProject\\NeusoftLibrary\\test\\model\\cnn2d",
-                "E:\\pythonworkspace\\neusoftProject\\NeusoftLibrary\\test\\log", 0.0001, 0.8, 0.7, 5, 100)
+    cnn2d.train(train_images, train_labels, "E:\pythonworkspace\\test\\model\\cnn2d",
+                "E:\\pythonworkspace\\\test\\log", 0.0001, 0.8, 0.7, 5, 100)
 
 
 def predict():
@@ -42,7 +42,7 @@ def predict():
     # convert from [0:255] => [0.0:1.0]
     test_images = np.multiply(test_images, 1.0 / 255.0)
     cnn2d = cnn2dModule(64, 64, 3, 2)
-    predictvalue = cnn2d.prediction("E:\pythonworkspace\\neusoftProject\\NeusoftLibrary\\test\\model\\cnn2d",
+    predictvalue = cnn2d.prediction("E:\pythonworkspace\\test\\model\\cnn2d",
                                     test_images)
     print(predictvalue[0])
 
