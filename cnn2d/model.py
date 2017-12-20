@@ -6,86 +6,6 @@ import tensorflow as tf
 import numpy as np
 
 
-def _create_conv_net(X, image_width, image_height, image_channel, image_labels, drop_conv, drop_hidden):
-    # CNN model
-    X1 = tf.reshape(X, [-1, image_width, image_height, image_channel])  # shape=(?, 32, 32, 3)
-    # Layer 1
-    W1 = weight_xavier_init(shape=[3, 3, 3, 32], n_inputs=3 * 3 * 3,
-                            n_outputs=32, variable_name='conv1_W')  # 3x3x1 conv, 32 outputs,image shape[32,32]->[32,32]
-    B1 = bias_variable([32], variable_name='conv1_B')
-
-    conv1 = convolution_2d(X1, W1) + B1
-    l1_conv = tf.nn.relu(conv1)  # shape=(?, 32, 32, 32)
-    l1_drop = tf.nn.dropout(l1_conv, drop_conv)
-    # Layer 2
-    W2 = weight_xavier_init(shape=[3, 3, 32, 32], n_inputs=3 * 3 * 32,
-                            n_outputs=32, variable_name='conv2_W')  # 3x3x1 conv, 32 outputs,image shape[32,32]->[16,16]
-    B2 = bias_variable([32], variable_name='conv2_B')
-
-    conv2 = convolution_2d(l1_drop, W2) + B2
-    l2_conv = tf.nn.relu(conv2)  # shape=(?, 32, 32, 32)
-    l2_pool = max_pool_2x2(l2_conv)  # shape=(?, 16, 16, 32)
-    l2_drop = tf.nn.dropout(l2_pool, drop_conv)
-    # Layer 3
-    W3 = weight_xavier_init(shape=[3, 3, 32, 64], n_inputs=3 * 3 * 32,
-                            n_outputs=64,
-                            variable_name='conv3_W')  # 3x3x32 conv, 64 outputs,image shape[16,16]->[16,16]
-    B3 = bias_variable([64], variable_name='conv3_B')
-
-    conv3 = convolution_2d(l2_drop, W3) + B3
-    l3_conv = tf.nn.relu(conv3)  # shape=(?, 16, 16, 64)
-    l3_drop = tf.nn.dropout(l3_conv, drop_conv)
-    # Layer 4
-    W4 = weight_xavier_init(shape=[3, 3, 64, 64],
-                            n_inputs=3 * 3 * 64,
-                            n_outputs=64, variable_name='conv4_W')  # 3x3x64 conv, 64 outputs,image shape[16,16]->[8,8]
-    B4 = bias_variable([64], variable_name='conv4_B')
-
-    conv4 = convolution_2d(l3_drop, W4) + B4
-    l4_conv = tf.nn.relu(conv4)  # shape=(?, 16, 16, 64)
-    l4_pool = max_pool_2x2(l4_conv)  # shape=(?, 8, 8, 64)
-    l4_drop = tf.nn.dropout(l4_pool, drop_conv)
-
-    # Layer 5
-    W5 = weight_xavier_init(shape=[3, 3, 64, 64], n_inputs=3 * 3 * 64,
-                            n_outputs=64,
-                            variable_name='conv5_W')  # 3x3x32 conv, 64 outputs,image shape[16,16]->[16,16]
-    B5 = bias_variable([64], variable_name='conv5_B')
-
-    conv5 = convolution_2d(l4_drop, W5) + B5
-    l5_conv = tf.nn.relu(conv5)  # shape=(?, 16, 16, 64)
-    l5_drop = tf.nn.dropout(l5_conv, drop_conv)
-    # Layer 6
-    W6 = weight_xavier_init(shape=[3, 3, 64, 64],
-                            n_inputs=3 * 3 * 64,
-                            n_outputs=64, variable_name='conv6_W')  # 3x3x64 conv, 64 outputs,image shape[16,16]->[8,8]
-    B6 = bias_variable([64], variable_name='conv6_B')
-
-    conv6 = convolution_2d(l5_drop, W6) + B6
-    l6_conv = tf.nn.relu(conv6)  # shape=(?, 16, 16, 64)
-    l6_pool = max_pool_2x2(l6_conv)  # shape=(?, 8, 8, 64)
-    l6_drop = tf.nn.dropout(l6_pool, drop_conv)
-    # Layer 7 - FC1
-    W5_FC1 = weight_xavier_init(shape=[64 * 8 * 8, 512],
-                                n_inputs=64 * 8 * 8, n_outputs=512,
-                                variable_name='conv7_W')  # FC: 64x8x8 inputs, 512 outputs
-    B5_FC1 = bias_variable([512], variable_name='conv7_B')
-
-    l5_flat = tf.reshape(l6_drop, [-1, W5_FC1.get_shape().as_list()[0]])  # shape=(?, 512)
-    FC1 = tf.matmul(l5_flat, W5_FC1) + B5_FC1
-    l5_feed = tf.nn.relu(FC1)
-    l5_drop = tf.nn.dropout(l5_feed, drop_hidden)
-    # Layer 8 - FC2
-    W6_FC2 = weight_xavier_init(shape=[512, image_labels],
-                                n_inputs=512, n_outputs=image_labels,
-                                variable_name='conv8_W')  # FC: 512 inputs, 2 outputs (labels)
-    B6_FC2 = bias_variable([image_labels], variable_name='conv8_B')
-
-    Y_pred = tf.nn.softmax(tf.matmul(l5_drop, W6_FC2) + B6_FC2)  # shape=(?, 2)
-
-    return Y_pred
-
-
 # Serve data by batches
 def _next_batch(train_images, train_labels, batch_size, index_in_epoch):
     start = index_in_epoch
@@ -126,15 +46,119 @@ class cnn2dModule(object):
         self.lr = tf.placeholder('float')
         self.drop_conv = tf.placeholder('float')
         self.drop_hidden = tf.placeholder('float')
+        self.image_width=tf.placeholder('float')
+        self.image_height=tf.placeholder('float')
+        self.channels=tf.placeholder('float')
+        self.n_class=tf.placeholder('float')
 
-        Y_pred = _create_conv_net(self.X, image_width, image_height, channels, n_class, self.drop_conv, self.drop_hidden)
-        self.cost = self.__get_cost(Y_pred, costname)
+        Y_pred = self._create_conv_net(self.X,self.Y_gt,False)
+        self.cost = self._make_parallel(self._create_conv_net,num_gpus=2,X=self.X,Y=self.Y_gt)
         self.accuracy = self.__get_accuracy(Y_pred)
         self.predict = tf.argmax(Y_pred, 1)
 
-    def __get_cost(self, Y_pred, cost_name):
+    def _create_conv_net(self,X, Y,Train=True):
+        image_width=self.image_width
+        image_height=self.image_height
+        channels=self.channels
+        n_class=self.n_class
+        drop_conv=self.drop_conv
+        drop_hidden=self.drop_hidden
+        # CNN model
+        X1 = tf.reshape(X, [-1, image_width, image_height, image_channel])  # shape=(?, 32, 32, 3)
+        # Layer 1
+        W1 = weight_xavier_init(shape=[3, 3, 3, 32], n_inputs=3 * 3 * 3,
+                                n_outputs=32, variable_name='conv1_W')  # 3x3x1 conv, 32 outputs,image shape[32,32]->[32,32]
+        B1 = bias_variable([32], variable_name='conv1_B')
+
+        conv1 = convolution_2d(X1, W1) + B1
+        l1_conv = tf.nn.relu(conv1)  # shape=(?, 32, 32, 32)
+        l1_drop = tf.nn.dropout(l1_conv, drop_conv)
+        # Layer 2
+        W2 = weight_xavier_init(shape=[3, 3, 32, 32], n_inputs=3 * 3 * 32,
+                                n_outputs=32, variable_name='conv2_W')  # 3x3x1 conv, 32 outputs,image shape[32,32]->[16,16]
+        B2 = bias_variable([32], variable_name='conv2_B')
+
+        conv2 = convolution_2d(l1_drop, W2) + B2
+        l2_conv = tf.nn.relu(conv2)  # shape=(?, 32, 32, 32)
+        l2_pool = max_pool_2x2(l2_conv)  # shape=(?, 16, 16, 32)
+        l2_drop = tf.nn.dropout(l2_pool, drop_conv)
+        # Layer 3
+        W3 = weight_xavier_init(shape=[3, 3, 32, 64], n_inputs=3 * 3 * 32,
+                                n_outputs=64,
+                                variable_name='conv3_W')  # 3x3x32 conv, 64 outputs,image shape[16,16]->[16,16]
+        B3 = bias_variable([64], variable_name='conv3_B')
+
+        conv3 = convolution_2d(l2_drop, W3) + B3
+        l3_conv = tf.nn.relu(conv3)  # shape=(?, 16, 16, 64)
+        l3_drop = tf.nn.dropout(l3_conv, drop_conv)
+        # Layer 4
+        W4 = weight_xavier_init(shape=[3, 3, 64, 64],
+                                n_inputs=3 * 3 * 64,
+                                n_outputs=64, variable_name='conv4_W')  # 3x3x64 conv, 64 outputs,image shape[16,16]->[8,8]
+        B4 = bias_variable([64], variable_name='conv4_B')
+
+        conv4 = convolution_2d(l3_drop, W4) + B4
+        l4_conv = tf.nn.relu(conv4)  # shape=(?, 16, 16, 64)
+        l4_pool = max_pool_2x2(l4_conv)  # shape=(?, 8, 8, 64)
+        l4_drop = tf.nn.dropout(l4_pool, drop_conv)
+
+        # Layer 5
+        W5 = weight_xavier_init(shape=[3, 3, 64, 64], n_inputs=3 * 3 * 64,
+                                n_outputs=64,
+                                variable_name='conv5_W')  # 3x3x32 conv, 64 outputs,image shape[16,16]->[16,16]
+        B5 = bias_variable([64], variable_name='conv5_B')
+
+        conv5 = convolution_2d(l4_drop, W5) + B5
+        l5_conv = tf.nn.relu(conv5)  # shape=(?, 16, 16, 64)
+        l5_drop = tf.nn.dropout(l5_conv, drop_conv)
+        # Layer 6
+        W6 = weight_xavier_init(shape=[3, 3, 64, 64],
+                                n_inputs=3 * 3 * 64,
+                                n_outputs=64, variable_name='conv6_W')  # 3x3x64 conv, 64 outputs,image shape[16,16]->[8,8]
+        B6 = bias_variable([64], variable_name='conv6_B')
+
+        conv6 = convolution_2d(l5_drop, W6) + B6
+        l6_conv = tf.nn.relu(conv6)  # shape=(?, 16, 16, 64)
+        l6_pool = max_pool_2x2(l6_conv)  # shape=(?, 8, 8, 64)
+        l6_drop = tf.nn.dropout(l6_pool, drop_conv)
+        # Layer 7 - FC1
+        W5_FC1 = weight_xavier_init(shape=[64 * 8 * 8, 512],
+                                    n_inputs=64 * 8 * 8, n_outputs=512,
+                                    variable_name='conv7_W')  # FC: 64x8x8 inputs, 512 outputs
+        B5_FC1 = bias_variable([512], variable_name='conv7_B')
+
+        l5_flat = tf.reshape(l6_drop, [-1, W5_FC1.get_shape().as_list()[0]])  # shape=(?, 512)
+        FC1 = tf.matmul(l5_flat, W5_FC1) + B5_FC1
+        l5_feed = tf.nn.relu(FC1)
+        l5_drop = tf.nn.dropout(l5_feed, drop_hidden)
+        # Layer 8 - FC2
+        W6_FC2 = weight_xavier_init(shape=[512, image_labels],
+                                    n_inputs=512, n_outputs=image_labels,
+                                    variable_name='conv8_W')  # FC: 512 inputs, 2 outputs (labels)
+        B6_FC2 = bias_variable([image_labels], variable_name='conv8_B')
+
+        Y_pred = tf.nn.softmax(tf.matmul(l5_drop, W6_FC2) + B6_FC2)  # shape=(?, 2)
+        if Train:
+            cost=self.__get_cost(Y_pred,Y,"cross_entropy")
+            return cost
+        else:
+            return Y_pred   
+        
+    def _make_parallel(self,fn,num_gpus,**kwargs):
+        in_splits={}
+        for k,v in kwargs.items():
+            in_splits[k]=tf.split(v,num_gpus)
+        
+        out_split=[]
+        for i in range(num_gpus):
+            with tf.device(tf.DeviceSpec(device_type="GPU",device_index=i)):
+                with tf.variable_scope(tf.get_variable_scope(),reuse=i>0):
+                    out_split.append(fn(**{k:v[i]fork,v in insplits.items()}))
+        return tf.concat(out_split,axis=0)
+        
+    def __get_cost(self, Y_pred, Y_gt,cost_name):
         if cost_name == "cross_entropy":
-            cost = -tf.reduce_sum(self.Y_gt * tf.log(Y_pred))
+            cost = -tf.reduce_sum(Y_gt * tf.log(Y_pred))
         return cost
     
     def __get_accuracy(self, Y_pred):
@@ -144,7 +168,8 @@ class cnn2dModule(object):
     
     def train(self, train_images, train_lanbels, model_path, logs_path, learning_rate,
               dropout_conv=0.8, dropout_hidden=0.7, train_epochs=10000, batch_size=100):
-        train_op = tf.train.AdamOptimizer(self.lr).minimize(self.cost)
+        
+        train_op = tf.train.AdamOptimizer(self.lr).minimize(self.cost,colocate_gradients_with_ops=True)
 
         init = tf.global_variables_initializer()
         saver = tf.train.Saver(tf.all_variables())
